@@ -1,0 +1,258 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width,initial-scale=1"><title>【开源项目】为openEuler5.10内核增添页表检查功能 | zzm</title><meta name="description" content="项目背景项目名称openEuler5.10内核支持页表检查功能（page table check） 项目基本需求（1）合入linux社区中页表检查功能的补丁到openEuler5.10中； （2）将页表检查功能对arm64的支持也添加到openEuler5.10； （3）对新特性进行一定的测试，并将合入主线已知的bugfix补丁以及可能存在的其他bug进行修复补丁，整理相关的bugfix合入到op"><meta name="keywords" content="开源之夏2022,openEuler,页表"><meta name="author" content="zzm"><meta name="copyright" content="zzm"><meta name="format-detection" content="telephone=no"><link rel="shortcut icon" href="/img/favicon.png"><link rel="canonical" href="https://aliez22.github.io/posts/23548/"><meta http-equiv="Cache-Control" content="no-transform"><meta http-equiv="Cache-Control" content="no-siteapp"><link rel="preconnect" href="//fastly.jsdelivr.net"/><link rel="preconnect" href="//fonts.googleapis.com" crossorigin="crossorigin"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="preconnect" href="//zz.bdstatic.com"/><meta property="og:type" content="article"><meta property="og:title" content="【开源项目】为openEuler5.10内核增添页表检查功能"><meta property="og:url" content="https://aliez22.github.io/posts/23548/"><meta property="og:site_name" content="zzm"><meta property="og:description" content="项目背景项目名称openEuler5.10内核支持页表检查功能（page table check） 项目基本需求（1）合入linux社区中页表检查功能的补丁到openEuler5.10中； （2）将页表检查功能对arm64的支持也添加到openEuler5.10； （3）对新特性进行一定的测试，并将合入主线已知的bugfix补丁以及可能存在的其他bug进行修复补丁，整理相关的bugfix合入到op"><meta property="og:image" content="https://fastly.jsdelivr.net/gh/AlieZ22/CDN-for-blog/pixiv/032.webp"><meta property="article:published_time" content="2022-06-16T01:30:55.000Z"><meta property="article:modified_time" content="2023-03-16T11:13:52.969Z"><meta name="twitter:card" content="summary"><script>var activateDarkMode = function () {
+  document.documentElement.setAttribute('data-theme', 'dark')
+  if (document.querySelector('meta[name="theme-color"]') !== null) {
+    document.querySelector('meta[name="theme-color"]').setAttribute('content', '#000')
+  }
+}
+var activateLightMode = function () {
+  document.documentElement.setAttribute('data-theme', 'light')
+  if (document.querySelector('meta[name="theme-color"]') !== null) {
+    document.querySelector('meta[name="theme-color"]').setAttribute('content', '#fff')
+  }
+}
+
+var getCookies = function (name) {
+  const value = `; ${document.cookie}`
+  const parts = value.split(`; ${name}=`)
+  if (parts.length === 2) return parts.pop().split(';').shift()
+}
+
+var autoChangeMode = 'false'
+var t = getCookies('theme')
+if (autoChangeMode === '1') {
+  var isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches
+  var isLightMode = window.matchMedia('(prefers-color-scheme: light)').matches
+  var isNotSpecified = window.matchMedia('(prefers-color-scheme: no-preference)').matches
+  var hasNoSupport = !isDarkMode && !isLightMode && !isNotSpecified
+
+  if (t === undefined) {
+    if (isLightMode) activateLightMode()
+    else if (isDarkMode) activateDarkMode()
+    else if (isNotSpecified || hasNoSupport) {
+      console.log('You specified no preference for a color scheme or your browser does not support it. I Schedule dark mode during night time.')
+      var now = new Date()
+      var hour = now.getHours()
+      var isNight = hour <= 6 || hour >= 18
+      isNight ? activateDarkMode() : activateLightMode()
+    }
+    window.matchMedia('(prefers-color-scheme: dark)').addListener(function (e) {
+      if (Cookies.get('theme') === undefined) {
+        e.matches ? activateDarkMode() : activateLightMode()
+      }
+    })
+  } else if (t === 'light') activateLightMode()
+  else activateDarkMode()
+} else if (autoChangeMode === '2') {
+  now = new Date()
+  hour = now.getHours()
+  isNight = hour <= 6 || hour >= 18
+  if (t === undefined) isNight ? activateDarkMode() : activateLightMode()
+  else if (t === 'light') activateLightMode()
+  else activateDarkMode()
+} else {
+  if (t === 'dark') activateDarkMode()
+  else if (t === 'light') activateLightMode()
+}</script><link rel="stylesheet" href="/css/index.css"><link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css"><link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/@fancyapps/fancybox@latest/dist/jquery.fancybox.min.css"><link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/node-snackbar/dist/snackbar.min.css"><link rel="prev" title="Effective C++ (第三版)" href="https://aliez22.github.io/posts/41157/"><link rel="next" title="深入探索linux内存管理中的page" href="https://aliez22.github.io/posts/37729/"><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Titillium+Web&amp;display=swap"><script>var GLOBAL_CONFIG = { 
+  root: '/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: {"defaultEncoding":2,"translateDelay":0,"msgToTraditionalChinese":"繁","msgToSimplifiedChinese":"簡"},
+  noticeOutdate: {"limitDay":500,"position":"top","messagePrev":"It has been","messageNext":"days since the last update, the content of the article may be outdated."},
+  copy: {
+    success: '复制成功',
+    error: '复制错误',
+    noSupport: '浏览器不支持'
+  },
+  bookmark: {
+    message_prev: '按',
+    message_next: '键将本页加入书签'
+  },
+  runtime_unit: '天',
+  runtime: false,
+  copyright: undefined,
+  ClickShowText: undefined,
+  medium_zoom: true,
+  fancybox: true,
+  Snackbar: {"bookmark":{"message_prev":"按","message_next":"键将本页加入书签"},"chs_to_cht":"你已切换为繁体","cht_to_chs":"你已切换为简体","day_to_night":"你已切换为深色模式","night_to_day":"你已切换为浅色模式","bgLight":"#49b1f5","bgDark":"#121212","position":"bottom-left"},
+  justifiedGallery: {
+    js: 'https://fastly.jsdelivr.net/npm/justifiedGallery/dist/js/jquery.justifiedGallery.min.js',
+    css: 'https://fastly.jsdelivr.net/npm/justifiedGallery/dist/css/justifiedGallery.min.css'
+  },
+  baiduPush: true,
+  highlightCopy: true,
+  highlightLang: true,
+  isPhotoFigcaption: false,
+  islazyload: true,
+  isanchor: false    
+}</script><script>var GLOBAL_CONFIG_SITE = { 
+  isPost: true,
+  isHome: false,
+  isHighlightShrink: false,
+  isSidebar: true,
+  postUpdate: '2023-03-16 19:13:52'
+}</script><noscript><style>
+#nav {
+  opacity: 1
+}
+.justified-gallery img{
+  opacity: 1
+}
+</style></noscript><link rel="stylesheet" href="https://fastly.jsdelivr.net/gh/sviptzk/HexoStaticFile@latest/Hexo/css/flink.min.css"></head><body><div id="mobile-sidebar"><div id="menu_mask"></div><div id="mobile-sidebar-menus"><div class="mobile_author_icon"><img class="avatar-img" src="https://fastly.jsdelivr.net/gh/AlieZ22/CDN-for-blog/images/avatar.jpg" onerror="onerror=null;src='/img/friend_404.gif'" alt="avatar"/></div><div class="mobile_post_data"><div class="mobile_data_item is-center"><div class="mobile_data_link"><a href="/archives/"><div class="headline">文章</div><div class="length_num">37</div></a></div></div><div class="mobile_data_item is-center">      <div class="mobile_data_link"><a href="/tags/"><div class="headline">标签</div><div class="length_num">47</div></a></div></div><div class="mobile_data_item is-center">     <div class="mobile_data_link"><a href="/categories/"><div class="headline">分类</div><div class="length_num">10</div></a></div></div></div><hr/><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fa fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fa fa-archive"></i><span> 时间轴</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fa fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/link/"><i class="fa-fw fa fa-link"></i><span> 友链</span></a></div><div class="menus_item"><a class="site-page" href="/about/"><i class="fa-fw fa fa-heart"></i><span> 关于</span></a></div></div></div></div><i class="fas fa-arrow-right on" id="toggle-sidebar"></i><div id="sidebar"><div class="sidebar-toc"><div class="sidebar-toc__title">目录</div><div class="sidebar-toc__progress"><span class="progress-notice">你已经读了</span><span class="progress-num">0</span><span class="progress-percentage">%</span><div class="sidebar-toc__progress-bar">     </div></div><div class="sidebar-toc__content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#项目背景"><span class="toc-number">1.</span> <span class="toc-text">项目背景</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#项目名称"><span class="toc-number">1.1.</span> <span class="toc-text">项目名称</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#项目基本需求"><span class="toc-number">1.2.</span> <span class="toc-text">项目基本需求</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#项目相关仓库"><span class="toc-number">1.3.</span> <span class="toc-text">项目相关仓库</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#项目产生原因"><span class="toc-number">1.4.</span> <span class="toc-text">项目产生原因</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#技术方法及可行性"><span class="toc-number">2.</span> <span class="toc-text">技术方法及可行性</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#Linux-内存管理相关"><span class="toc-number">2.1.</span> <span class="toc-text">Linux 内存管理相关</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#Linux内核开发相关"><span class="toc-number">2.2.</span> <span class="toc-text">Linux内核开发相关</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#项目详细方案"><span class="toc-number">3.</span> <span class="toc-text">项目详细方案</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#将page-table-check补丁合入openEuler5-10"><span class="toc-number">3.1.</span> <span class="toc-text">将page table check补丁合入openEuler5.10</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#将arm64的支持添加到openEuler5-10"><span class="toc-number">3.2.</span> <span class="toc-text">将arm64的支持添加到openEuler5.10</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#整理相关bugfix合入到openEuler5-10"><span class="toc-number">3.3.</span> <span class="toc-text">整理相关bugfix合入到openEuler5.10</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#项目规划"><span class="toc-number">4.</span> <span class="toc-text">项目规划</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#项目开发第一阶段（7月1日-7月30日）"><span class="toc-number">4.1.</span> <span class="toc-text">项目开发第一阶段（7月1日~7月30日）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#项目开发第二阶段（8月1日-8月30日）"><span class="toc-number">4.2.</span> <span class="toc-text">项目开发第二阶段（8月1日~8月30日）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#项目开发第三阶段（9月1日-9月30日）"><span class="toc-number">4.3.</span> <span class="toc-text">项目开发第三阶段（9月1日~9月30日）</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#PR-Link"><span class="toc-number">5.</span> <span class="toc-text">PR Link</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#参考"><span class="toc-number">6.</span> <span class="toc-text">参考</span></a></li></ol></div></div></div><div id="body-wrap"><div id="web_bg" data-type="photo"></div><header class="post-bg" id="page-header" style="background-image: url(https://fastly.jsdelivr.net/gh/AlieZ22/CDN-for-blog/pixiv/032.webp)"><nav id="nav"><span class="pull-left" id="blog_name"><a class="blog_title" id="site-name" href="/">zzm</a></span><span class="pull-right menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fa fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fa fa-archive"></i><span> 时间轴</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fa fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/link/"><i class="fa-fw fa fa-link"></i><span> 友链</span></a></div><div class="menus_item"><a class="site-page" href="/about/"><i class="fa-fw fa fa-heart"></i><span> 关于</span></a></div></div><span class="toggle-menu close"><a class="site-page"><i class="fas fa-bars fa-fw"></i></a></span></span></nav><div id="post-info"><div id="post-title"><div class="posttitle">【开源项目】为openEuler5.10内核增添页表检查功能</div></div><div id="post-meta"><div class="meta-firstline"><time class="post-meta__date"><span class="post-meta__date-created" title="发表于 2022-06-16 09:30:55"><i class="far fa-calendar-alt fa-fw"></i> 发表于 2022-06-16</span><span class="post-meta__separator">|</span><span class="post-meta__date-updated" title="更新于 2023-03-16 19:13:52"><i class="fas fa-history fa-fw"></i> 更新于 2023-03-16</span></time><span class="post-meta__categories"><span class="post-meta__separator">|</span><i class="fas fa-inbox fa-fw post-meta__icon"></i><a class="post-meta__categories" href="/categories/%E5%BC%80%E6%BA%90%E9%A1%B9%E7%9B%AE/">开源项目</a></span></div><div class="meta-secondline"> </div><div class="meta-thirdline"><span class="post-meta-pv-cv"><i class="far fa-eye fa-fw post-meta__icon"></i><span>阅读量:</span><span id="busuanzi_value_page_pv"></span></span></div></div></div></header><main class="layout_post" id="content-inner"><article id="post"><div class="post-content" id="article-container"><h2 id="项目背景"><a href="#项目背景" class="headerlink" title="项目背景"></a>项目背景</h2><h3 id="项目名称"><a href="#项目名称" class="headerlink" title="项目名称"></a>项目名称</h3><p>openEuler5.10内核支持页表检查功能（page table check）</p>
+<h3 id="项目基本需求"><a href="#项目基本需求" class="headerlink" title="项目基本需求"></a>项目基本需求</h3><p>（1）合入linux社区中页表检查功能的补丁到openEuler5.10中；</p>
+<p>（2）将页表检查功能对arm64的支持也添加到openEuler5.10；</p>
+<p>（3）对新特性进行一定的测试，并将合入主线已知的bugfix补丁以及可能存在的其他bug进行修复补丁，整理相关的bugfix合入到openEuler5.10。</p>
+<h3 id="项目相关仓库"><a href="#项目相关仓库" class="headerlink" title="项目相关仓库"></a>项目相关仓库</h3><p>OpenEuler: <a href="https://gitee.com/openeuler/kernel/tree/openEuler-22.09/" target="_blank" rel="noopener">https://gitee.com/openeuler/kernel/tree/openEuler-22.09/</a></p>
+<h3 id="项目产生原因"><a href="#项目产生原因" class="headerlink" title="项目产生原因"></a>项目产生原因</h3><p>21年11月，一名Google工程师发现linux内核存在一个<strong>引用数据下溢</strong>（reference count underflow）问题[1-2]，而且该问题一直可以追溯到2017年的Linux 4.14内核。该问题会导致无意的页面共享，让内存从一个进程泄露到另一个进程中。为解决此内存缺陷，提出了全新的“页表检查（page table check）”解决方案。</p>
+<p><strong>具体问题</strong>：<a href="https://www.spinics.net/lists/stable/msg515079.html" target="_blank" rel="noopener">https://www.spinics.net/lists/stable/msg515079.html</a></p>
+<p>PERF_SAMPLE_PHYS_ADDR 事件利用 perf_virt_to_phys() 将PMU虚拟地址转化为物理地址。其中利用了两个函数：get_user_page_fast() 以及 page_to_phys()。</p>
+<p>在一些情况下，get_user_page_fast_only() 会发生错误并返回false，这表明没有页面引用，但是却仍然用没有页面引用的页去初始化页面指针，在这样的情况下，perf_virt_to_phys() 调用 put_page() 就会导致页面引用下溢，进一步会引起无意识的页面共享。</p>
+<p>【疑惑】page sharing的原理，以及page sharing时page 的 _refcount 是怎样的？</p>
+<p>在struct page结构中，有非常多的内容，其中之一是_refcount，这是一个atomic_t类型的变量，统计这个page有多少个reference（引用）。atomic_t类型其实就是一个有符号的32bit数，只要_refcount不是0，就说明有对这个page的reference存在，不能把它挪作他用；当_refcount变成0的时候，这个page就能被free了。</p>
+<h2 id="技术方法及可行性"><a href="#技术方法及可行性" class="headerlink" title="技术方法及可行性"></a>技术方法及可行性</h2><p>该项目的主要工作是将linux社区新增的补丁包（page table check）迁移到openEuler，并进行相关的测试，整理bugfix。此前，我看过linux0.11的相关源码，自己也开发过一个开源的块设备驱动模块，对block layer以及内存管理相关的结构体以及框架比较了解，也熟悉Linux内核开发的流程，可以胜任这个项目。</p>
+<h3 id="Linux-内存管理相关"><a href="#Linux-内存管理相关" class="headerlink" title="Linux 内存管理相关"></a>Linux 内存管理相关</h3><p>linux的内存管理机制主要是分页机制，即将地址空间等分成一个固定大小的页，而一个页的大小由硬件或者操作系统来决定，目前绝大多数操作系统都以4KB作为页的大小。</p>
+<p>（1）linux内存管理中涉及几个重要概念：</p>
+<ol>
+<li><strong>页</strong>：页是将线性地址按固定长度划分得到的，页的内部是连续的地址空间。页是内核进行内存管理的基本单位。</li>
+<li><strong>zone</strong>：zone主要用于将页进行逻辑上的分组，但是并没有物理上的意义。比如在x86体系中可以分为3个zone：ZONE_DMA, ZONE_NORMAL, ZONE_HIGHMEM。</li>
+<li><strong>页框</strong>：可以理解成RAM中的页，或者是物理页。页框的大小与一个页的大小一致。页框与页不同，后者只表示一个数据块，可以放在任何页框或者磁盘中。</li>
+<li><strong>页表</strong>：要将页放到页框中，但是连续的页不一定放在连续的页框上，所以就需要一个类似映射表的数据结构，它就是页表。页表负责将线性地址映射到物理地址中。</li>
+</ol>
+<p>有了这些概念的铺垫，就能够通过逻辑地址找到物理地址了，linux中主要采用的是多级页表的方式来寻址，这样能够大大节省页表所占用的内存空间。</p>
+<p>（2）页的相关操作：</p>
+<ol>
+<li><p>获得页：使用<code>alloc_pages</code>接口来获得页</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">inline</span> struct page * <span class="title">alloc_pages</span><span class="params">(<span class="keyword">gfp_t</span> gfp_mask, <span class="keyword">unsigned</span> <span class="keyword">int</span> order)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="keyword">return</span> alloc_pages_current(gfp_mask, order);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>其中，参数gfp_mask标志获得页所使用的行为方式，参数order指定分配多少页（2^order个连续物理页面），返回的指针指向第一个page。</p>
+<p>另外还有__get_free_pages，alloc_page以及__get_free_page函数都可以分配页，但本质都是调用alloc_pages来进行的。</p>
+</li>
+<li><p>释放页：可以使用__free_pages，__free_page，free_pages或者free_page来释放页。</p>
+</li>
+</ol>
+<p>（3）页表相关操作：</p>
+<p><img src= "/img/loading.gif" data-src="https://www.kernel.org/doc/gorman/html/understand/understand-html006.png" alt="页表结构"></p>
+<p>页表布局如图所示，linux使用三级页表来进行管理。</p>
+<p>每一个进程都有一个指针(mm_struct-&gt;pgd)指向它的页面全局目录（PGD），它是一个物理页框。这个页框中包括一个类型为pgd_t的数组。每一个PGD表中的项又指向一个页框，这个页框包含一个类型为pmd_t的数组，这个PMD的每一项指向一个类型为pte_t的页框，这个页框被称为页表项（PTE），这个PTE其实就指向了包含用户数据的那些页框。</p>
+<ol>
+<li><p>使用页表项PTE</p>
+<ul>
+<li><p>pdg_offset(): 由线性地址和mm_struct得到对应的PGD项</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">define</span> pgd_offset(mm, address) ((mm)-&gt;pgd+pgd_index(address))</span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> pgd_index(address) (((address) &gt;&gt; PGDIR_SHIFT) &amp; (PTRS_PER_PGD-1))</span></span><br></pre></td></tr></table></figure>
+</li>
+<li><p>pmd_offset(): 由PGD项得到页框地址，再结合一个线性地址得到PMD表中的偏移，进而得到PMD项</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">define</span> pmd_offset(dir, address) ((pmd_t *) pgd_page(*(dir)) + pmd_index(address))</span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> pgd_page(pgd) ((unsigned long) __va(pgd_val(pgd) &amp; PAGE_MASK))</span></span><br></pre></td></tr></table></figure>
+</li>
+<li><p>pte_offset_kernel(): 由PMD项得到页框地址，再结合一个线性地址得到PTE中的偏移，进而得到PTE项</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">define</span> pte_offset_kernel(pmd, address) ((pte_t *) pmd_page_kernel(*(pmd)) +  pte_index(address))</span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> pmd_page_kernel(pmd) ((unsigned long) __va(pmd_val(pmd) &amp; PAGE_MASK))</span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> pte_index(address) (((address) &gt;&gt; PAGE_SHIFT) &amp; (PTRS_PER_PTE - 1))</span></span><br></pre></td></tr></table></figure>
+</li>
+<li><p>页表检查：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">pte_none(), pmd_none() and pgd_none()：如果对应的项不存在，返回1</span><br><span class="line">pte_present(), pmd_present() and pgd_present()：如果对应项的PRESENT为被置位，返回1</span><br><span class="line">pte_clear(), pmd_clear() and pgd_clear()：会清除对应的项</span><br><span class="line">pmd_bad() and pgd_bad() :检查页表项是否符合要求</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>页表权限检查：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">pte_read()：用来测试pte的读权限，pte_mkread() 设置读权限，pte_rdprotect()取消读权限</span><br><span class="line">pte_write()：用来测试pte的写权限，pte_mkwrite() 设置读权限，pte_wrprotect()取消读权限</span><br><span class="line">pte_dirty()：用来测试是否有被写过，pte_mkdirty()设置dirty位，pte_mkclean()清除dirty位</span><br><span class="line">pte_young()：用来测试是否是新页，pte_mkyoung()设置新页，pte_old()设置位旧页（检查access位）</span><br></pre></td></tr></table></figure>
+</li>
+</ul>
+</li>
+<li><p>分配和释放页表：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">分配：pgd_alloc(), pmd_alloc(), pte_alloc()</span><br><span class="line">释放：pdg_free(), pmd_free(), pte_free()</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>转移和释放页表：</p>
+<ul>
+<li><p>mk_pte(): 输入一个struct page和保护位形成pte_t类型的PTE项</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">define</span> page_to_pfn(page)	((unsigned long)((page) - mem_map)) </span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> pfn_pte(pfn, prot)	__pte(((pfn) &lt;&lt; PAGE_SHIFT) | pgprot_val(prot)) </span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> mk_pte(page, pgprot)	pfn_pte(page_to_pfn(page), (pgprot))</span></span><br></pre></td></tr></table></figure>
+</li>
+<li><p>set_pte(): 输入一个PMD页框内的地址，然后将PTE项赋值在该地址中</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">define</span> set_pte(pteptr, pteval) (*(pteptr) = pteval)</span></span><br></pre></td></tr></table></figure>
+</li>
+<li><p>pte_page(): 将PTE项转化为struct page</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">define</span> pte_page(pte)	pfn_to_page(pte_pfn(pte))</span></span><br></pre></td></tr></table></figure>
+
+
+
+</li>
+</ul>
+</li>
+</ol>
+<h3 id="Linux内核开发相关"><a href="#Linux内核开发相关" class="headerlink" title="Linux内核开发相关"></a>Linux内核开发相关</h3><p>Linux内核大部分由C语言写成，部分会有与汇编语言的联合编程。内核C遵循ISO C89标准，且不依赖于标准C库的支持，不过这也导致浮点运算不被允许等问题。</p>
+<p>内核开发的流程包括几个“主内核分支”和很多子系统相关的内核分支，这些分支包括：</p>
+<ul>
+<li>内核源码树</li>
+<li>多个主要版本的稳定版内核树</li>
+<li>子系统相关的内核树</li>
+<li>linux-next集成测试树</li>
+</ul>
+<p>同时，对于linux来说，bugzilla.kernel.org是Linux内核开发者们用来跟踪内核Bug的网站，其中，内核源码主目录中的:ref:admin-guide/reporting-bugs.rst <reportingbugs> 文件里有一个很好的模板。它指导用户如何报告可能的内核bug以及需要提供哪些信息来帮助内核开发者们找到问题的根源。</p>
+<p>对于修复bug的补丁，应该被恰当地介绍、讨论，并拆成独立的小段。小的补丁不需要太多的时间和精力去验证其正确性，同时也会是调试变得非常容易。</p>
+<p>当修复补丁时，需要完全地描述补丁：（1）为什么需要这个修改；（2）补丁的总体设计；（3）实现细节；（4）测试结果。</p>
+<h2 id="项目详细方案"><a href="#项目详细方案" class="headerlink" title="项目详细方案"></a>项目详细方案</h2><h3 id="将page-table-check补丁合入openEuler5-10"><a href="#将page-table-check补丁合入openEuler5-10" class="headerlink" title="将page table check补丁合入openEuler5.10"></a>将page table check补丁合入openEuler5.10</h3><p>如图，这里是page table check补丁包的所有改动：</p>
+<p><img src= "/img/loading.gif" data-src="https://s2.loli.net/2022/06/16/rwHJVyhbuXGfYKA.webp" alt="page-table-overview.webp"></p>
+<p>具体的，分成了四个部分，可以在归档中查看每个修改的详细信息：</p>
+<ol>
+<li><p>mm: change page type prior to adding page table entry</p>
+<p>在这个修改中，主要修改了添加页表项的时机，在添加页表项之前修改页面类型。主要涉及到改动的文件有：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">mm&#x2F;hugetlb.c  | 6 +++---</span><br><span class="line">mm&#x2F;memory.c   | 9 +++++----</span><br><span class="line">mm&#x2F;migrate.c  | 5 ++---</span><br><span class="line">mm&#x2F;swapfile.c | 4 ++--</span><br><span class="line">4 files changed, 12 insertions(+), 12 deletions(-)</span><br></pre></td></tr></table></figure>
+
+<p>在该项目中，可以跟踪这些修改，来对应将它们同步到openEuler5.10中。</p>
+</li>
+<li><p>mm: ptep_clear() page table helper</p>
+<p>在该修改中，添加了一个新函数——ptep_clear()，能够在通用的代码下从页表中删除PTE项。而且后续将利用这个函数与页表检查建立一个联系（hook）。</p>
+<p>其中，主要涉及到改动的文件有：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">Documentation&#x2F;vm&#x2F;arch_pgtable_helpers.rst |  6 ++++--</span><br><span class="line"> include&#x2F;linux&#x2F;pgtable.h                   |  8 ++++++++</span><br><span class="line"> mm&#x2F;debug_vm_pgtable.c                     |  2 +-</span><br><span class="line"> mm&#x2F;khugepaged.c                           | 12 ++----------</span><br><span class="line"> 4 files changed, 15 insertions(+), 13 deletions(-)</span><br></pre></td></tr></table></figure>
+
+<p>同样地，跟踪这些修改，并同步到openEuler上即可。</p>
+</li>
+<li><p>mm: page table check</p>
+<p>这个修改是核心功能，在页面添加和删除的时候检查用户页表项。并且允许同步捕获与双重映射相关的内存损坏问题。</p>
+<p>当一个匿名页的 pte 被添加到页表中时，我们验证这个 pte 还没有指向一个文件支持的页，反之亦然，如果这是一个正在添加的文件支持的页，我们验证这个页没有匿名映射。</p>
+<p>我们还强制允许匿名页的只读共享（i.e. cow after fork）。 所有其他共享必须用于文件页。</p>
+<p>页表检查允许保护和调试“struct page”元数据由于某种原因损坏的情况。 例如，当 refcnt 或 mapcount 变得无效时。</p>
+<p>其中涉及到改动的文件比较多，包括：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">Documentation&#x2F;vm&#x2F;index.rst            |   1 +</span><br><span class="line"> Documentation&#x2F;vm&#x2F;page_table_check.rst |  56 ++++++</span><br><span class="line"> MAINTAINERS                           |   9 +</span><br><span class="line"> arch&#x2F;Kconfig                          |   3 +</span><br><span class="line"> include&#x2F;linux&#x2F;page_table_check.h      | 147 ++++++++++++++</span><br><span class="line"> mm&#x2F;Kconfig.debug                      |  24 +++</span><br><span class="line"> mm&#x2F;Makefile                           |   1 +</span><br><span class="line"> mm&#x2F;page_alloc.c                       |   4 +</span><br><span class="line"> mm&#x2F;page_ext.c                         |   4 +</span><br><span class="line"> mm&#x2F;page_table_check.c                 | 270 ++++++++++++++++++++++++++</span><br><span class="line"> 10 files changed, 519 insertions(+)</span><br><span class="line"> create mode 100644 Documentation&#x2F;vm&#x2F;page_table_check.rst</span><br><span class="line"> create mode 100644 include&#x2F;linux&#x2F;page_table_check.h</span><br><span class="line"> create mode 100644 mm&#x2F;page_table_check.c</span><br></pre></td></tr></table></figure>
+
+<p>跟踪修改，同步支持！</p>
+</li>
+<li><p>x86: mm: add x86_64 support for page table check</p>
+<p>这个修改中，就是完成之前所说的hook了，即将页面表格检查挂钩添加到修改用户页表的例程中。</p>
+<p>由于在第二个修改中已经完成了相关功能，所以这里的改动并不多，包括：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">arch&#x2F;x86&#x2F;Kconfig               |  1 +</span><br><span class="line"> arch&#x2F;x86&#x2F;include&#x2F;asm&#x2F;pgtable.h | 29 +++++++++++++++++++++++++++--</span><br><span class="line"> 2 files changed, 28 insertions(+), 2 deletions(-)</span><br></pre></td></tr></table></figure>
+
+</li>
+</ol>
+<h3 id="将arm64的支持添加到openEuler5-10"><a href="#将arm64的支持添加到openEuler5-10" class="headerlink" title="将arm64的支持添加到openEuler5.10"></a>将arm64的支持添加到openEuler5.10</h3><p>这个补丁集进行了一些简单的更改，并使page table check更容易支持新的架构，主要是在ARM64和RISCV上支持此功能。该补丁集的全部改动如下图所示：</p>
+<p><img src= "/img/loading.gif" data-src="https://s2.loli.net/2022/06/16/XyiCZ7LjFxQkHSP.webp" alt="page-table-arm64.webp"></p>
+<p>包括两个开发者的一共6次修改。</p>
+<p>总共的改动其实也不多，可以到归档的文章列表中看到具体每一项的改动信息</p>
+<p><img src= "/img/loading.gif" data-src="https://s2.loli.net/2022/06/16/OZxL2Yr8unR6GEI.webp" alt="page-table-arm64-patch.webp"></p>
+<p>同3.1的方法，仔细跟踪补丁集所做的修改，做到细心。</p>
+<h3 id="整理相关bugfix合入到openEuler5-10"><a href="#整理相关bugfix合入到openEuler5-10" class="headerlink" title="整理相关bugfix合入到openEuler5.10"></a>整理相关bugfix合入到openEuler5.10</h3><p>其实，页表检查这个补丁对应的问题可以追溯到2017年的Linux4.14内核中，发现引用数据下溢会导致内存从一个进程泄露到另一个进程。为解决此类内存缺陷，才引入了page table check。</p>
+<p>在邮件列表中已经提到出现过的几个bug了，包括：</p>
+<p><img src= "/img/loading.gif" data-src="https://s2.loli.net/2022/06/16/pRUIPqv9FfljzCD.png" alt="1654089544902.png"></p>
+<p>可以将这些作为bugfix合入openEuler5.10中，同时，在完成3.1，3.2后我也会进行一些列测试，若发现存在其他bug，也会依照补丁修复的要求来进行bugfix。</p>
+<h2 id="项目规划"><a href="#项目规划" class="headerlink" title="项目规划"></a>项目规划</h2><h3 id="项目开发第一阶段（7月1日-7月30日）"><a href="#项目开发第一阶段（7月1日-7月30日）" class="headerlink" title="项目开发第一阶段（7月1日~7月30日）"></a>项目开发第一阶段（7月1日~7月30日）</h3><ul>
+<li><input checked="" disabled="" type="checkbox"> 深入熟悉页表相关内核源码，做到心中有数</li>
+<li><input checked="" disabled="" type="checkbox"> 完成需求1：将page table check补丁合入openEuler5.10<ul>
+<li><input checked="" disabled="" type="checkbox"> change page type prior to adding page table entry</li>
+<li><input checked="" disabled="" type="checkbox"> ptep_clear() page table helper</li>
+<li><input checked="" disabled="" type="checkbox"> page table check</li>
+<li><input checked="" disabled="" type="checkbox"> add x86_64 support for page table check</li>
+</ul>
+</li>
+<li><input checked="" disabled="" type="checkbox"> 进行第一阶段测试，确定该补丁正确合入内核</li>
+<li><input checked="" disabled="" type="checkbox"> 对第一阶段任务进行总结，思考可以改进的地方</li>
+</ul>
+<h3 id="项目开发第二阶段（8月1日-8月30日）"><a href="#项目开发第二阶段（8月1日-8月30日）" class="headerlink" title="项目开发第二阶段（8月1日~8月30日）"></a>项目开发第二阶段（8月1日~8月30日）</h3><ul>
+<li><input checked="" disabled="" type="checkbox"> 完成需求2：将arm64的支持添加到openEuler5.10</li>
+<li><input checked="" disabled="" type="checkbox"> 进行第二阶段测试</li>
+<li><input checked="" disabled="" type="checkbox"> 对第二阶段任务进行总结，思考可以继续提升的地方</li>
+</ul>
+<h3 id="项目开发第三阶段（9月1日-9月30日）"><a href="#项目开发第三阶段（9月1日-9月30日）" class="headerlink" title="项目开发第三阶段（9月1日~9月30日）"></a>项目开发第三阶段（9月1日~9月30日）</h3><ul>
+<li><input checked="" disabled="" type="checkbox"> 整理测试结果</li>
+<li><input checked="" disabled="" type="checkbox"> 整理bugfix相关文档，并合入内核</li>
+<li><input checked="" disabled="" type="checkbox"> 对项目进行总结思考</li>
+</ul>
+<h2 id="PR-Link"><a href="#PR-Link" class="headerlink" title="PR Link"></a>PR Link</h2><p><a href="https://gitee.com/openeuler/kernel/pulls/114" target="_blank" rel="noopener">Add page table check for openEuler-22.09 · Pull Request !114 · openEuler/kernel - Gitee.com</a></p>
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><ol>
+<li><a href="https://www.163.com/dy/article/GP18G9H90511BLFD.html" target="_blank" rel="noopener">Google提议用“页表检查”功能应对Linux内核的内存崩坏问题</a></li>
+<li>[[PATCH 5.15 18/20]perf/core: Avoid put_page() when GUP fails - Greg Kroah-Hartman](</li>
+</ol>
+</div><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta">文章作者: </span><span class="post-copyright-info"><a href="mailto:undefined">zzm</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta">文章链接: </span><span class="post-copyright-info"><a href="https://aliez22.github.io/posts/23548/">https://aliez22.github.io/posts/23548/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta">版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来自 <a href="https://aliez22.github.io" target="_blank">zzm</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/%E5%BC%80%E6%BA%90%E4%B9%8B%E5%A4%8F2022/">开源之夏2022</a><a class="post-meta__tags" href="/tags/openEuler/">openEuler</a><a class="post-meta__tags" href="/tags/%E9%A1%B5%E8%A1%A8/">页表</a></div><div class="post_share"><div class="social-share" data-image="https://fastly.jsdelivr.net/gh/AlieZ22/CDN-for-blog/pixiv/041.webp" data-sites="facebook,twitter,wechat,weibo,qq"></div><link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/social-share.js/dist/css/share.min.css"/><script src="https://fastly.jsdelivr.net/npm/social-share.js/dist/js/social-share.min.js"></script></div></div><nav class="pagination-post" id="pagination"><div class="prev-post pull-left"><a href="/posts/41157/"><img class="prev-cover" data-src="https://fastly.jsdelivr.net/gh/AlieZ22/CDN-for-blog/pixiv/038.webp" onerror="onerror=null;src='/img/404.jpg'"><div class="pagination-info"><div class="label">上一篇</div><div class="prev_info">Effective C++ (第三版)</div></div></a></div><div class="next-post pull-right"><a href="/posts/37729/"><img class="next-cover" data-src="https://fastly.jsdelivr.net/gh/AlieZ22/CDN-for-blog/pixiv/031.webp" onerror="onerror=null;src='/img/404.jpg'"><div class="pagination-info"><div class="label">下一篇</div><div class="next_info">深入探索linux内存管理中的page</div></div></a></div></nav></article></main><footer id="footer" data-type="color"><div id="footer-wrap"><div class="copyright">&copy;2020 - 2023  <i id="heartbeat" class="fa fas fa-heartbeat"></i> zzm</div><div class="framework-info"><span> &gt;明确目标 不留余力&lt; </span></div></div><head><link rel="stylesheet" href="https://fastly.jsdelivr.net/gh/HCLonely/images@master/others/heartbeat.min.css"><meta name="generator" content="Hexo 4.2.0"></head></footer></div><section id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="font_plus" type="button" title="放大字体"><i class="fas fa-plus"></i></button><button id="font_minus" type="button" title="缩小字体"><i class="fas fa-minus"></i></button><button id="translateLink" type="button" title="简繁转换">繁</button><button id="darkmode" type="button" title="浅色和深色模式转换"><i class="fas fa-adjust"></i></button></div><div id="rightside-config-show"><button id="rightside_config" type="button" title="设置"><i class="fas fa-cog"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><button id="go-up" type="button" title="回到顶部"><i class="fas fa-arrow-up"></i></button></div></section><script src="https://fastly.jsdelivr.net/npm/jquery@latest/dist/jquery.min.js"></script><script src="/js/utils.js"></script><script src="/js/main.js"></script><script src="/js/tw_cn.js"></script><script src="https://fastly.jsdelivr.net/npm/medium-zoom/dist/medium-zoom.min.js"></script><script src="https://fastly.jsdelivr.net/npm/@fancyapps/fancybox@latest/dist/jquery.fancybox.min.js"></script><script src="https://fastly.jsdelivr.net/npm/node-snackbar/dist/snackbar.min.js"></script><script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script><script src="https://fastly.jsdelivr.net/npm/instant.page/instantpage.min.js" type="module" defer></script><script src="https://fastly.jsdelivr.net/npm/vanilla-lazyload/dist/lazyload.iife.min.js" async></script><script src="/js/calendar.js"></script><script src="/js/languages.js"></script></body></html>

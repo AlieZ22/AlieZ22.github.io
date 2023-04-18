@@ -1,0 +1,274 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width,initial-scale=1"><title>深入io到epoll与linux内核系统调用 | zzm</title><meta name="description" content="主要来源：马士兵课程《深入io到epoll与linux内核的系统调用》    预备学习方法：学一个技术，找到问题，推理解决   计算机的组成有内存（主存），cpu，io设备等。程序运行在内存中，内存可以理解成一个线性地址空间，内存里放的是运行时的程序，程序有各种指令和数据。 内存可以分为两个部分：内核空间 和 用户空间 其中有一些概念：  保护模式：参考https:&#x2F;&#x2F;zhuanlan.zhihu"><meta name="keywords" content="io,epoll"><meta name="author" content="zzm"><meta name="copyright" content="zzm"><meta name="format-detection" content="telephone=no"><link rel="shortcut icon" href="/img/favicon.png"><link rel="canonical" href="https://aliez22.github.io/posts/27168/"><meta http-equiv="Cache-Control" content="no-transform"><meta http-equiv="Cache-Control" content="no-siteapp"><link rel="preconnect" href="//fastly.jsdelivr.net"/><link rel="preconnect" href="//fonts.googleapis.com" crossorigin="crossorigin"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="preconnect" href="//zz.bdstatic.com"/><meta property="og:type" content="article"><meta property="og:title" content="深入io到epoll与linux内核系统调用"><meta property="og:url" content="https://aliez22.github.io/posts/27168/"><meta property="og:site_name" content="zzm"><meta property="og:description" content="主要来源：马士兵课程《深入io到epoll与linux内核的系统调用》    预备学习方法：学一个技术，找到问题，推理解决   计算机的组成有内存（主存），cpu，io设备等。程序运行在内存中，内存可以理解成一个线性地址空间，内存里放的是运行时的程序，程序有各种指令和数据。 内存可以分为两个部分：内核空间 和 用户空间 其中有一些概念：  保护模式：参考https:&#x2F;&#x2F;zhuanlan.zhihu"><meta property="og:image" content="https://fastly.jsdelivr.net/gh/AlieZ22/CDN-for-blog/pixiv/013.webp"><meta property="article:published_time" content="2021-04-11T06:14:26.000Z"><meta property="article:modified_time" content="2022-06-07T12:38:34.468Z"><meta name="twitter:card" content="summary"><script>var activateDarkMode = function () {
+  document.documentElement.setAttribute('data-theme', 'dark')
+  if (document.querySelector('meta[name="theme-color"]') !== null) {
+    document.querySelector('meta[name="theme-color"]').setAttribute('content', '#000')
+  }
+}
+var activateLightMode = function () {
+  document.documentElement.setAttribute('data-theme', 'light')
+  if (document.querySelector('meta[name="theme-color"]') !== null) {
+    document.querySelector('meta[name="theme-color"]').setAttribute('content', '#fff')
+  }
+}
+
+var getCookies = function (name) {
+  const value = `; ${document.cookie}`
+  const parts = value.split(`; ${name}=`)
+  if (parts.length === 2) return parts.pop().split(';').shift()
+}
+
+var autoChangeMode = 'false'
+var t = getCookies('theme')
+if (autoChangeMode === '1') {
+  var isDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches
+  var isLightMode = window.matchMedia('(prefers-color-scheme: light)').matches
+  var isNotSpecified = window.matchMedia('(prefers-color-scheme: no-preference)').matches
+  var hasNoSupport = !isDarkMode && !isLightMode && !isNotSpecified
+
+  if (t === undefined) {
+    if (isLightMode) activateLightMode()
+    else if (isDarkMode) activateDarkMode()
+    else if (isNotSpecified || hasNoSupport) {
+      console.log('You specified no preference for a color scheme or your browser does not support it. I Schedule dark mode during night time.')
+      var now = new Date()
+      var hour = now.getHours()
+      var isNight = hour <= 6 || hour >= 18
+      isNight ? activateDarkMode() : activateLightMode()
+    }
+    window.matchMedia('(prefers-color-scheme: dark)').addListener(function (e) {
+      if (Cookies.get('theme') === undefined) {
+        e.matches ? activateDarkMode() : activateLightMode()
+      }
+    })
+  } else if (t === 'light') activateLightMode()
+  else activateDarkMode()
+} else if (autoChangeMode === '2') {
+  now = new Date()
+  hour = now.getHours()
+  isNight = hour <= 6 || hour >= 18
+  if (t === undefined) isNight ? activateDarkMode() : activateLightMode()
+  else if (t === 'light') activateLightMode()
+  else activateDarkMode()
+} else {
+  if (t === 'dark') activateDarkMode()
+  else if (t === 'light') activateLightMode()
+}</script><link rel="stylesheet" href="/css/index.css"><link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/@fortawesome/fontawesome-free/css/all.min.css"><link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/@fancyapps/fancybox@latest/dist/jquery.fancybox.min.css"><link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/node-snackbar/dist/snackbar.min.css"><link rel="prev" title="磁盘测试工具fio的安装问题" href="https://aliez22.github.io/posts/50709/"><link rel="next" title="单链表反转的四种方法" href="https://aliez22.github.io/posts/%E5%8D%95%E9%93%BE%E8%A1%A8%E5%8F%8D%E8%BD%AC/"><link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Titillium+Web&amp;display=swap"><script>var GLOBAL_CONFIG = { 
+  root: '/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: {"defaultEncoding":2,"translateDelay":0,"msgToTraditionalChinese":"繁","msgToSimplifiedChinese":"簡"},
+  noticeOutdate: {"limitDay":500,"position":"top","messagePrev":"It has been","messageNext":"days since the last update, the content of the article may be outdated."},
+  copy: {
+    success: '复制成功',
+    error: '复制错误',
+    noSupport: '浏览器不支持'
+  },
+  bookmark: {
+    message_prev: '按',
+    message_next: '键将本页加入书签'
+  },
+  runtime_unit: '天',
+  runtime: false,
+  copyright: undefined,
+  ClickShowText: undefined,
+  medium_zoom: true,
+  fancybox: true,
+  Snackbar: {"bookmark":{"message_prev":"按","message_next":"键将本页加入书签"},"chs_to_cht":"你已切换为繁体","cht_to_chs":"你已切换为简体","day_to_night":"你已切换为深色模式","night_to_day":"你已切换为浅色模式","bgLight":"#49b1f5","bgDark":"#121212","position":"bottom-left"},
+  justifiedGallery: {
+    js: 'https://fastly.jsdelivr.net/npm/justifiedGallery/dist/js/jquery.justifiedGallery.min.js',
+    css: 'https://fastly.jsdelivr.net/npm/justifiedGallery/dist/css/justifiedGallery.min.css'
+  },
+  baiduPush: true,
+  highlightCopy: true,
+  highlightLang: true,
+  isPhotoFigcaption: false,
+  islazyload: true,
+  isanchor: false    
+}</script><script>var GLOBAL_CONFIG_SITE = { 
+  isPost: true,
+  isHome: false,
+  isHighlightShrink: false,
+  isSidebar: true,
+  postUpdate: '2022-06-07 20:38:34'
+}</script><noscript><style>
+#nav {
+  opacity: 1
+}
+.justified-gallery img{
+  opacity: 1
+}
+</style></noscript><link rel="stylesheet" href="https://fastly.jsdelivr.net/gh/sviptzk/HexoStaticFile@latest/Hexo/css/flink.min.css"></head><body><div id="mobile-sidebar"><div id="menu_mask"></div><div id="mobile-sidebar-menus"><div class="mobile_author_icon"><img class="avatar-img" src="https://fastly.jsdelivr.net/gh/AlieZ22/CDN-for-blog/images/avatar.jpg" onerror="onerror=null;src='/img/friend_404.gif'" alt="avatar"/></div><div class="mobile_post_data"><div class="mobile_data_item is-center"><div class="mobile_data_link"><a href="/archives/"><div class="headline">文章</div><div class="length_num">37</div></a></div></div><div class="mobile_data_item is-center">      <div class="mobile_data_link"><a href="/tags/"><div class="headline">标签</div><div class="length_num">47</div></a></div></div><div class="mobile_data_item is-center">     <div class="mobile_data_link"><a href="/categories/"><div class="headline">分类</div><div class="length_num">10</div></a></div></div></div><hr/><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fa fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fa fa-archive"></i><span> 时间轴</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fa fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/link/"><i class="fa-fw fa fa-link"></i><span> 友链</span></a></div><div class="menus_item"><a class="site-page" href="/about/"><i class="fa-fw fa fa-heart"></i><span> 关于</span></a></div></div></div></div><i class="fas fa-arrow-right on" id="toggle-sidebar"></i><div id="sidebar"><div class="sidebar-toc"><div class="sidebar-toc__title">目录</div><div class="sidebar-toc__progress"><span class="progress-notice">你已经读了</span><span class="progress-num">0</span><span class="progress-percentage">%</span><div class="sidebar-toc__progress-bar">     </div></div><div class="sidebar-toc__content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#预备"><span class="toc-number">1.</span> <span class="toc-text">预备</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#I-O"><span class="toc-number">2.</span> <span class="toc-text">I&#x2F;O</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#同步阻塞模型（BIO）"><span class="toc-number">2.1.</span> <span class="toc-text">同步阻塞模型（BIO）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#同步非阻塞模型（NIO）"><span class="toc-number">2.2.</span> <span class="toc-text">同步非阻塞模型（NIO）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#多路复用（select-polll）"><span class="toc-number">2.3.</span> <span class="toc-text">多路复用（select&#x2F;polll）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#多路复用（epoll）"><span class="toc-number">2.4.</span> <span class="toc-text">多路复用（epoll）</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#Linux底层追踪手段"><span class="toc-number">3.</span> <span class="toc-text">Linux底层追踪手段</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#图表总结"><span class="toc-number">4.</span> <span class="toc-text">图表总结</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#参考资料"><span class="toc-number">5.</span> <span class="toc-text">参考资料</span></a></li></ol></div></div></div><div id="body-wrap"><div id="web_bg" data-type="photo"></div><header class="post-bg" id="page-header" style="background-image: url(https://fastly.jsdelivr.net/gh/AlieZ22/CDN-for-blog/pixiv/013.webp)"><nav id="nav"><span class="pull-left" id="blog_name"><a class="blog_title" id="site-name" href="/">zzm</a></span><span class="pull-right menus"><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fa fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fa fa-archive"></i><span> 时间轴</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fa fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page" href="/link/"><i class="fa-fw fa fa-link"></i><span> 友链</span></a></div><div class="menus_item"><a class="site-page" href="/about/"><i class="fa-fw fa fa-heart"></i><span> 关于</span></a></div></div><span class="toggle-menu close"><a class="site-page"><i class="fas fa-bars fa-fw"></i></a></span></span></nav><div id="post-info"><div id="post-title"><div class="posttitle">深入io到epoll与linux内核系统调用</div></div><div id="post-meta"><div class="meta-firstline"><time class="post-meta__date"><span class="post-meta__date-created" title="发表于 2021-04-11 14:14:26"><i class="far fa-calendar-alt fa-fw"></i> 发表于 2021-04-11</span><span class="post-meta__separator">|</span><span class="post-meta__date-updated" title="更新于 2022-06-07 20:38:34"><i class="fas fa-history fa-fw"></i> 更新于 2022-06-07</span></time><span class="post-meta__categories"><span class="post-meta__separator">|</span><i class="fas fa-inbox fa-fw post-meta__icon"></i><a class="post-meta__categories" href="/categories/Linux%E6%8A%80%E6%9C%AF/">Linux技术</a></span></div><div class="meta-secondline"> </div><div class="meta-thirdline"><span class="post-meta-pv-cv"><i class="far fa-eye fa-fw post-meta__icon"></i><span>阅读量:</span><span id="busuanzi_value_page_pv"></span></span></div></div></div></header><main class="layout_post" id="content-inner"><article id="post"><div class="post-content" id="article-container"><p>主要来源：马士兵课程《深入io到epoll与linux内核的系统调用》   </p>
+<h2 id="预备"><a href="#预备" class="headerlink" title="预备"></a>预备</h2><p>学习方法：学一个技术，找到问题，推理解决 </p>
+<p><img src= "/img/loading.gif" data-src="https://i.loli.net/2021/04/11/I9isb4FEx7lu1o3.png" alt="1617699743978.png"></p>
+<p>计算机的组成有内存（主存），cpu，io设备等。程序运行在内存中，内存可以理解成一个<strong>线性地址空间</strong>，内存里放的是运行时的程序，程序有各种指令和数据。</p>
+<p>内存可以分为两个部分：<code>内核空间</code> 和 <code>用户空间</code></p>
+<p>其中有一些概念：</p>
+<blockquote>
+<p>保护模式：参考<a href="https://zhuanlan.zhihu.com/p/42309472" target="_blank" rel="noopener">https://zhuanlan.zhihu.com/p/42309472</a></p>
+<p>用户空间，内核空间：OS的进程空间可以分为用户空间和内核空间，它们有不同的执行权限。</p>
+<p>用户态，内核态</p>
+<p>切换：用户态到内核态切换的三种方式（系统调用-软中断，异常-如缺页中断，外设中断）。态的切换具有比较大的开销。</p>
+</blockquote>
+<p>计算机刚启动时，首先会将<strong>内核程序</strong>加载进内存。内核是一种特殊的<code>软件程序</code>，能够<strong>控制计算机的硬件资源</strong>（比如：协调CPU资源，分配内存资源，提供稳定的环境供应用运行）。</p>
+<p>保护模式中存在一个table（全局描述符表，<code>GDT</code>），来进行约束，描述哪部分是内核空间，哪部分是用户空间。<code>GDT</code>的地址会放到<code>cpu</code>的寄存器中。比如，<code>tomcat</code>中有条指令需要取的数据地址在内核空间，那么就会报错，这样来保护内核不受到不明程序的破坏。</p>
+<blockquote>
+<p>为什么要有内核程序呢？</p>
+<p>假如有一块硬盘，所有想访问它的用户程序都需要编写其驱动，并且开发很多东西。而利用内核程序来管理所有硬件设备，向外提供接口给应用程序访问，这样符合工程学的理论。内核提供对硬件设备的管理和调控，同时保护了系统的安全。</p>
+</blockquote>
+<p>通常编写用户程序时，需要导入一些库，这些库称为<code>api</code>（应用程序编程接口）。但也不是说库就可以直接访问内核空间，而是库调用内核暴露的方法（系统调用）。</p>
+<p>应用程序–&gt;库/shell–&gt;系统调用–&gt;内核</p>
+<p><img src= "/img/loading.gif" data-src="https://i.loli.net/2021/04/12/cOLHQ5isY3Ft9jG.jpg" alt="images.jpg"></p>
+<blockquote>
+<p>系统调用（system call）</p>
+<p>是指运行在用户空间的程序向操作系统内核请求需要更高权限运行的服务。系统调用提供用户程序与操作系统之间的接口。大多数交互式操作需求在内核态运行。如设备IO操作或进程间通信。</p>
+<p>系统调用将Linux整个体系分为用户态和内核态。</p>
+</blockquote>
+<p>这时候来思考：内核是程序，<code>shell</code>是程序，<code>tomcat</code>也是程序，如果cpu只有1核，那么某一个程序在执行时，是不是说这个程序在cpu上永久执行下去，其他程序就无法进入cpu了吗？</p>
+<p>【因为在开发时，自己并没有写相关程序执行多少毫秒就切换给其他程序的语句，程序并没有让出过】</p>
+<p>这里面有很多东西：cpu中有一个<code>晶振</code>的概念，产生有规律的震动，每次震动产生一个事件。这之中有一套系统称为<code>中断</code>。这是非常重要的概念，因为没有中断的话，一个程序就会死在cpu上。</p>
+<p><strong>中断</strong>是一个宏观名词，分为硬中断和软中断。</p>
+<ul>
+<li>硬中断（hardirq）。硬中断是由与系统相连的外设（比如网卡，硬盘，时钟）产生的。主要用来通知操作系统外设状态的变化。比如网卡收到数据包的时候，就会发出一个中断。</li>
+<li>软中断（softirq）。为了满足实时系统的需求，中断处理应该越快越好。linux为了实现这个特点，当中断发生时，硬中断处理哪些短时间就可以完成的工作，而将哪些处理时间比较长的工作，放在中断之后来完成，也就是软中断来完成。比如陷阱陷入（80中断），此时cpu开始切换态。</li>
+</ul>
+<p>软中断非常像硬中断，然而它们仅仅是由当前正在运行的进程所产生的。通常软中断用于处理I/O请求，软中断仅与内核想联系，并且不会直接地中断cpu。</p>
+<p>软中断是一种需要内核为正在运行的进程去做一些事情（I/O，系统调用等）的请求。</p>
+<h2 id="I-O"><a href="#I-O" class="headerlink" title="I/O"></a>I/O</h2><blockquote>
+<p>什么是I/O？</p>
+<p>I/O（Input/Output），即输入输出，通常指数据在存储器或其他周边设备之间的输入和输出，是信息处理系统（如计算机）与外部世界（人类或另一信息处理系统）之间的通信。</p>
+</blockquote>
+<blockquote>
+<p><strong>I/O的工作模式</strong>（消息通信机制）：</p>
+<ul>
+<li><p>同步：调用者会<strong>主动等待</strong>调用结果。按照“调用者”线程在等待调用结果时的状态可以分为：</p>
+<ul>
+<li>阻塞：线程被操作系统挂起</li>
+<li>非阻塞：线程不被操作系统挂起，可以处理其他事情</li>
+</ul>
+</li>
+<li><p>异步：调用者发起一个异步调用，然后立即返回去做别的事。“被调用者”通过<strong>状态、通知、回调函数</strong>等手段来通知“调用者”。</p>
+<p>异步IO不是FIFO有序的，例如进程A与进程B先后对一个端口发起了异步读操作，有可能事进程B先得到读操作的结果。</p>
+</li>
+</ul>
+</blockquote>
+<p>同步/异步，阻塞/非阻塞还需要仔细甄别！</p>
+<p>我们讨论网络I/O一般针对linux操作系统而言，网络I/O的发展过程是随着linux内核的演变而变化的，因此网络I/O可以大致分为以下的几个阶段。每个阶段，都是对于之前阶段的缺陷进行的改进。下面就对每个阶段网络I/O解决了哪些问题、优点、缺点进行剖析：</p>
+<p><img src= "/img/loading.gif" data-src="https://i.loli.net/2021/04/11/xLnFhB7KJ45lyke.png" alt="1617969747738.png"></p>
+<h3 id="同步阻塞模型（BIO）"><a href="#同步阻塞模型（BIO）" class="headerlink" title="同步阻塞模型（BIO）"></a>同步阻塞模型（BIO）</h3><p>BIO（Blocking-IO）指的是，数据的读取写入阻塞在这个线程内等待完成（处理过程中线程被阻塞）。</p>
+<p>使用经典的烧开水例子来解释：这里假设一个烧开水的场景，有一排水壶在烧开水，<code>BIO</code>的工作模式就是， 叫一个线程停留在一个水壶那，直到这个水壶烧开，才去处理下一个水壶。但是实际上线程在等待水壶烧开的时间段什么都没有做。</p>
+<p><img src= "/img/loading.gif" data-src="https://i.loli.net/2021/04/11/t4hcxnF2mdkK3wT.png" alt="1617970214679.png"></p>
+<p> <code>BIO</code>可以利用多线程模型来优化<img src= "/img/loading.gif" data-src="https://i.loli.net/2021/04/11/RJIGn835jiZrgoL.png" alt="1617970087340.png"></p>
+<p>但是多线程模型也有很明显的问题：</p>
+<ol>
+<li>需要<code>clone</code>线程，造成了开销</li>
+<li>线程越多，cpu依次询问每个线程，但是晶振时间一过又去访问别的程序，来回切换其实需要等很久才能真正去处理数据。</li>
+</ol>
+<p>问题的表面是多线程，但是实际上其根源问题是因为堵塞。一个<code>client</code>对进程造成了堵塞，所以才会将这个<code>client</code>的数据传输交给一个线程来防止进程的堵塞。</p>
+<h3 id="同步非阻塞模型（NIO）"><a href="#同步非阻塞模型（NIO）" class="headerlink" title="同步非阻塞模型（NIO）"></a>同步非阻塞模型（NIO）</h3><p>NIO（Non-Blocking IO 或 new IO），说的是单线程可以以非阻塞的方式处理多个I/O。</p>
+<p>NIO有两层含义：</p>
+<ol>
+<li>（程序框架）new io    新的io框架</li>
+<li>（内核调用）SOCK_NONBLOCK     非阻塞</li>
+</ol>
+<p>将每个<code>socket fd</code>设置为非阻塞，等待的时候会立刻返回，如果没有数据就会显示错误码。将所有client轮询以检查是否有数据进行传输。这样单线程就能够处理多个client。</p>
+<p>依旧用烧水壶的例子来说的话，NIO的做法是让一个线程不断的轮询每个水壶的状态，看看是否有水壶的状态发生了改变，从而进行下一步的操作。</p>
+<p><img src= "/img/loading.gif" data-src="https://i.loli.net/2021/04/11/zOBb6xEHeXSn1sQ.png" alt="1617971555995.png"></p>
+<p>单线程同步非阻塞的问题：</p>
+<ul>
+<li><strong>轮询</strong>可能造成很大的时间浪费。比如每轮询一次，有1000个client，但每次只有1个有数据，那么将会有999次系统调用被浪费。</li>
+</ul>
+<p>有很多系统调用被浪费了，那么如何解决呢？ –&gt; 多路复用</p>
+<h3 id="多路复用（select-polll）"><a href="#多路复用（select-polll）" class="headerlink" title="多路复用（select/polll）"></a>多路复用（select/polll）</h3><p>每次循环client就变成了 O(1) select(fd1000s)， O(3): accept read recvfrom。减少了系统调用。返回的是事件，表示哪些fd可以用，但是是自己去用，是同步的。  select是内核内部自己遍历所有fd。相比NIO进行所有fd次数的态的切换开销更小，但还是有浪费。</p>
+<p><img src= "/img/loading.gif" data-src="https://i.loli.net/2021/04/11/krtYMRLJdbzjsEK.png" alt="1617973548170.png"></p>
+<p><code>select</code>的api：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// readfds:关心读的fd集合；writefds：关心写的fd集合；excepttfds：异常的fd集合</span></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">select</span> <span class="params">(<span class="keyword">int</span> n, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, struct timeval *timeout)</span></span>;</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>select 目前几乎在所有的平台上支持，其良好跨平台支持也是它的一个优点。select 的一 个缺点在于单个进程能够监视的文件描述符的数量存在最大限制，在 Linux 上一般为 1024，可以通过修改宏定义甚至重新编译内核的方式提升这一限制，但 是这样也会造成效率的降低。</p>
+</blockquote>
+<p><code>poll</code>的api：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">poll</span> <span class="params">(struct pollfd *fds, <span class="keyword">unsigned</span> <span class="keyword">int</span> nfds, <span class="keyword">int</span> timeout)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">pollfd</span> &#123;</span></span><br><span class="line">    <span class="keyword">int</span> fd; <span class="comment">/* file descriptor */</span></span><br><span class="line">    short events; <span class="comment">/* requested events to watch */</span></span><br><span class="line">    short revents; <span class="comment">/* returned events witnessed */</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>pollfd 结构包含了要监视的 event 和发生的 event，不再使用 select“参数-值”传递的方式。同时，pollfd 并没有最大数量限制（但是数量过大后性能也是会下降）。 和 select 函数一样，poll 返回后，需要轮询 pollfd 来获取就绪的描述符。</p>
+</blockquote>
+<p><code>select</code>的问题：</p>
+<ol>
+<li>每次都有很多fd数据通过select传递给内核</li>
+<li>内核遍历传入的fds，同样具有比较大的复杂度</li>
+</ol>
+<h3 id="多路复用（epoll）"><a href="#多路复用（epoll）" class="headerlink" title="多路复用（epoll）"></a>多路复用（epoll）</h3><p>epoll_create()在内核开辟一个空间（efd8），服务端调用epoll_ctr()将需要关注的socket文件描述符以及想要关注的事件添加到开辟的空间。此时程序会调用epoll_wait()，询问epoll fd8。假设客户端到来，经过TCP三次握手，此事件到来时   开辟另一个空间，将fd5放入。</p>
+<p><img src= "/img/loading.gif" data-src="https://i.loli.net/2021/04/11/HypUfTD3GoEkVAz.png" alt="1618060034249.png"></p>
+<p><code>epoll</code>提供的api：</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//创建epollFd，底层是在内核态分配一段区域，底层数据结构红黑树+双向链表</span></span><br><span class="line">int epoll_create(int size)；//创建一个epoll的句柄，size用来告诉内核这个监听的数目一共有多大</span><br><span class="line"></span><br><span class="line"><span class="comment">//往红黑树中增加、删除、更新管理的socket fd</span></span><br><span class="line">int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)；</span><br><span class="line"></span><br><span class="line"><span class="comment">//这个api是用来在第一阶段阻塞，等待就绪的fd。</span></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">epoll_wait</span><span class="params">(<span class="keyword">int</span> epfd, struct epoll_event * events, <span class="keyword">int</span> maxevents, <span class="keyword">int</span> timeout)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="number">1.</span> <span class="function"><span class="keyword">int</span> <span class="title">epoll_create</span><span class="params">(<span class="keyword">int</span> <span class="built_in">size</span>)</span></span>;</span><br><span class="line">创建一个epoll的句柄，<span class="built_in">size</span>用来告诉内核这个监听的数目一共有多大，这个参数不同于select()中的第一个参数，给出最大监听的fd+<span class="number">1</span>的值，参数<span class="built_in">size</span>并不是限制了epoll所能监听的描述符最大个数，只是对内核初始分配内部数据结构的一个建议。</span><br><span class="line">当创建好epoll句柄后，它就会占用一个fd值，在linux下如果查看/proc/进程id/fd/，是能够看到这个fd的，所以在使用完epoll后，必须调用<span class="built_in">close</span>()关闭，否则可能导致fd被耗尽。</span><br><span class="line"></span><br><span class="line">2. int epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)；</span><br><span class="line">函数是对指定描述符fd执行op操作。</span><br><span class="line">- epfd：是epoll_create()的返回值。</span><br><span class="line">- op：表示op操作，用三个宏来表示：添加EPOLL_CTL_ADD，删除EPOLL_CTL_DEL，修改EPOLL_CTL_MOD。分别添加、删除和修改对fd的监听事件。</span><br><span class="line">- fd：是需要监听的fd（文件描述符）</span><br><span class="line">- epoll_event：是告诉内核需要监听什么事，<span class="class"><span class="keyword">struct</span> <span class="title">epoll_event</span>结构如下：</span></span><br><span class="line"><span class="class"></span></span><br><span class="line"><span class="class"><span class="title">struct</span> <span class="title">epoll_event</span> &#123;</span></span><br><span class="line">  <span class="keyword">__uint32_t</span> events;  <span class="comment">/* Epoll events */</span></span><br><span class="line">  <span class="keyword">epoll_data_t</span> data;  <span class="comment">/* User data variable */</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="comment">//events可以是以下几个宏的集合：</span></span><br><span class="line">EPOLLIN ：表示对应的文件描述符可以读（包括对端SOCKET正常关闭）；</span><br><span class="line">EPOLLOUT：表示对应的文件描述符可以写；</span><br><span class="line">EPOLLPRI：表示对应的文件描述符有紧急的数据可读（这里应该表示有带外数据到来）；</span><br><span class="line">EPOLLERR：表示对应的文件描述符发生错误；</span><br><span class="line">EPOLLHUP：表示对应的文件描述符被挂断；</span><br><span class="line">EPOLLET： 将EPOLL设为边缘触发(Edge Triggered)模式，这是相对于水平触发(Level Triggered)来说的。</span><br><span class="line">EPOLLONESHOT：只监听一次事件，当监听完这次事件之后，如果还需要继续监听这个socket的话，需要再次把这个socket加入到EPOLL队列里</span><br><span class="line"></span><br><span class="line"><span class="number">3.</span> <span class="function"><span class="keyword">int</span> <span class="title">epoll_wait</span><span class="params">(<span class="keyword">int</span> epfd, struct epoll_event * events, <span class="keyword">int</span> maxevents, <span class="keyword">int</span> timeout)</span></span>;</span><br><span class="line">等待epfd上的io事件，最多返回maxevents个事件。</span><br><span class="line">参数events用来从内核得到事件的集合，maxevents告之内核这个events有多大，这个maxevents的值不能大于创建epoll_create()时的<span class="built_in">size</span>，参数timeout是超时时间（毫秒，<span class="number">0</span>会立即返回，<span class="number">-1</span>将不确定，也有说法说是永久阻塞）。该函数返回需要处理的事件数目，如返回<span class="number">0</span>表示已超时。</span><br></pre></td></tr></table></figure>
+
+
+
+<p>epoll的工作模式：</p>
+<ul>
+<li>LT（level triggered）模式，是缺省的工作方式，并且同时支持 block 和 no-block socket.在这种做法中，内核告诉你一个文件描述符是否就绪了，然后你可以对这个就绪的 fd 进行 IO 操作。如果你不作任何操作，内核还是会继续通知你的。</li>
+<li>ET（edge-triggered）模式，是高速工作方式，只支持 no-block socket。在这种模式下，当描述符从未就绪变为就绪时，内核通过 epoll 告诉你。然后它会假设你知道文件描述符已经就绪，并且不会再为那个文件描述符发送更多的就绪通知，直到你做了某些操作导致那个文件描述符不再为就绪状态了(比如，你在发送，接收或者接收请求，或者发送接收的数据少于一定量时导致了一个 EWOULDBLOCK 错误）。但是请注意，如果一直不对这个 fd 做 IO 操作(从而导致它再次变成未就绪)，内核不会发送更多的通知(only once)。</li>
+</ul>
+<p>ET 模式在很大程度上减少了 epoll 事件被重复触发的次数，因此效率要比 LT 模式高。epoll 工作在 ET 模式的时候，必须使用非阻塞套接口，以避免由于一个文件句柄的阻塞读/阻塞写操作把处理多个文件描述符的任务饿死。</p>
+<p>底层为epoll的应用：redis, nginx, netty, kafka</p>
+<p>零拷贝（sendfile），mmap</p>
+<p>mmap可以在程序外开辟一个存储空间，这个空间应用程序可以访问，内核也可以访问，是文件的一个映射。</p>
+<p>下面是kafka模型的一个例子：</p>
+<p><img src= "/img/loading.gif" data-src="https://i.loli.net/2021/04/11/hUXYvIsLw951bjQ.png" alt="1618060795634.png"></p>
+<p>IO多路复用（select, poll, epoll）总结：</p>
+<p><img src= "/img/loading.gif" data-src="https://fastly.jsdelivr.net/gh/AlieZ22/CDN-for-blog/usage/IO%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8.png" alt="io多路复用"></p>
+<p>网络IO各个阶段的总结：</p>
+<p><img src= "/img/loading.gif" data-src="https://fastly.jsdelivr.net/gh/AlieZ22/CDN-for-blog/usage/io-history.jpg" alt="网络io总结"></p>
+<h2 id="Linux底层追踪手段"><a href="#Linux底层追踪手段" class="headerlink" title="Linux底层追踪手段"></a>Linux底层追踪手段</h2><p>授人以鱼不如授人以渔。上面对于epoll到系统调用的分析主要是通过以下linux命令进行操作的。</p>
+<ol>
+<li><p>查看帮助文档</p>
+<p>例如：<code>man 2 socket</code> ，其中的2表示系统调用</p>
+</li>
+<li><p>nc（netcat）</p>
+<p>类似于网络server和客户端，可以模拟tomcat</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;&#x2F; 在本地8080端口开启监听（服务端）</span><br><span class="line">nc -l localhost 8080</span><br><span class="line"></span><br><span class="line">&#x2F;&#x2F; 客户端建立连接（会随机分配端口号），可以发送数据</span><br><span class="line">nc localhost 8080</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>linux中进程查询</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ps -fe | grep &lt;进程名&gt;(如nc)</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>查询网络状态</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">netstat -natp</span><br></pre></td></tr></table></figure>
+
+<p>a表示all，所有；t表示tcp，p表示进程</p>
+</li>
+<li><p>查看进程</p>
+<p>linux中一切皆文件，进程也是一个文件。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">cd &#x2F;proc&#x2F;&lt;PID&gt;(如1484)</span><br><span class="line"></span><br><span class="line">&#x2F;&#x2F; 查看文件描述符</span><br><span class="line">cd fd</span><br><span class="line">ll 或 ls -l</span><br></pre></td></tr></table></figure>
+
+<p>其中<code>fd</code>目录保存了该进程的文件描述符，<code>task</code>目录保存了该进程的线程。</p>
+</li>
+<li><p>追踪一个程序有几个线程，并且每个线程对系统有哪些系统调用</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">strace -ff -o .&#x2F;xxoo java TestSocket</span><br></pre></td></tr></table></figure>
+
+<p>-ff表示fork fork，连主线程子线程都追踪；-o表示追踪内容记录到文件中；./xxoo是文件的前缀；后面是执行程序。</p>
+<p>可以用vim查看具体某个线程的内容，如 <code>vi xxoo.1639</code></p>
+<p>vim中查询某个词  /&lt;内容&gt;  ,  设置行号 : set nu</p>
+</li>
+<li><p>追踪文件</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">tail -f xxoo.1638</span><br></pre></td></tr></table></figure>
+
+<p>其中-f表示阻塞，一直追踪</p>
+</li>
+</ol>
+<h2 id="图表总结"><a href="#图表总结" class="headerlink" title="图表总结"></a>图表总结</h2><p>下面两张图是本文的总结。该课程弄明白了IO框架的演变过程，但其中还有很多细节值得学习，后续也会在本文中进行不断的补充。</p>
+<p><img src= "/img/loading.gif" data-src="https://i.loli.net/2021/04/11/LEziOF9nh25SpWk.png" alt="p1"></p>
+<p><img src= "/img/loading.gif" data-src="https://i.loli.net/2021/04/11/EC1BdJex3MGAVcl.png" alt="p2"></p>
+<p><img src= "/img/loading.gif" data-src="https://fastly.jsdelivr.net/gh/AlieZ22/CDN-for-blog/usage/io-frame.jpg" alt="网络io总结"></p>
+<h2 id="参考资料"><a href="#参考资料" class="headerlink" title="参考资料"></a>参考资料</h2><ul>
+<li><a href="https://zh.wikipedia.org/wiki/I/O" target="_blank" rel="noopener">https://zh.wikipedia.org/wiki/I/O</a></li>
+<li><a href="https://zhuanlan.zhihu.com/p/353692786" target="_blank" rel="noopener">https://zhuanlan.zhihu.com/p/353692786</a></li>
+<li><a href="https://blog.csdn.net/weixin_40413961/article/details/106485833" target="_blank" rel="noopener">https://blog.csdn.net/weixin_40413961/article/details/106485833</a></li>
+<li><a href="https://blog.csdn.net/Crazy_Tengt/article/details/79225913" target="_blank" rel="noopener">https://blog.csdn.net/Crazy_Tengt/article/details/79225913</a></li>
+</ul>
+<p>补充记录：</p>
+<ul>
+<li>2021.4.12：补充了预备部分的内容，对名词做出解释，优化语句的流畅感。</li>
+<li>2021.4.13：完善IO部分内容，添加相关说明以及多路复用模型相关api，添加参考资料</li>
+</ul>
+<p>最近在为毕设发愁，暂时停更一会。</p>
+</div><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta">文章作者: </span><span class="post-copyright-info"><a href="mailto:undefined">zzm</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta">文章链接: </span><span class="post-copyright-info"><a href="https://aliez22.github.io/posts/27168/">https://aliez22.github.io/posts/27168/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta">版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来自 <a href="https://aliez22.github.io" target="_blank">zzm</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/io/">io</a><a class="post-meta__tags" href="/tags/epoll/">epoll</a></div><div class="post_share"><div class="social-share" data-image="https://fastly.jsdelivr.net/gh/AlieZ22/CDN-for-blog/pixiv/041.webp" data-sites="facebook,twitter,wechat,weibo,qq"></div><link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/social-share.js/dist/css/share.min.css"/><script src="https://fastly.jsdelivr.net/npm/social-share.js/dist/js/social-share.min.js"></script></div></div><nav class="pagination-post" id="pagination"><div class="prev-post pull-left"><a href="/posts/50709/"><img class="prev-cover" data-src="https://fastly.jsdelivr.net/gh/AlieZ22/CDN-for-blog/pixiv/014.webp" onerror="onerror=null;src='/img/404.jpg'"><div class="pagination-info"><div class="label">上一篇</div><div class="prev_info">磁盘测试工具fio的安装问题</div></div></a></div><div class="next-post pull-right"><a href="/posts/%E5%8D%95%E9%93%BE%E8%A1%A8%E5%8F%8D%E8%BD%AC/"><img class="next-cover" data-src="https://fastly.jsdelivr.net/gh/AlieZ22/CDN-for-blog/pixiv/007.webp" onerror="onerror=null;src='/img/404.jpg'"><div class="pagination-info"><div class="label">下一篇</div><div class="next_info">单链表反转的四种方法</div></div></a></div></nav></article></main><footer id="footer" data-type="color"><div id="footer-wrap"><div class="copyright">&copy;2020 - 2023  <i id="heartbeat" class="fa fas fa-heartbeat"></i> zzm</div><div class="framework-info"><span> &gt;明确目标 不留余力&lt; </span></div></div><head><link rel="stylesheet" href="https://fastly.jsdelivr.net/gh/HCLonely/images@master/others/heartbeat.min.css"><meta name="generator" content="Hexo 4.2.0"></head></footer></div><section id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="font_plus" type="button" title="放大字体"><i class="fas fa-plus"></i></button><button id="font_minus" type="button" title="缩小字体"><i class="fas fa-minus"></i></button><button id="translateLink" type="button" title="简繁转换">繁</button><button id="darkmode" type="button" title="浅色和深色模式转换"><i class="fas fa-adjust"></i></button></div><div id="rightside-config-show"><button id="rightside_config" type="button" title="设置"><i class="fas fa-cog"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><button id="go-up" type="button" title="回到顶部"><i class="fas fa-arrow-up"></i></button></div></section><script src="https://fastly.jsdelivr.net/npm/jquery@latest/dist/jquery.min.js"></script><script src="/js/utils.js"></script><script src="/js/main.js"></script><script src="/js/tw_cn.js"></script><script src="https://fastly.jsdelivr.net/npm/medium-zoom/dist/medium-zoom.min.js"></script><script src="https://fastly.jsdelivr.net/npm/@fancyapps/fancybox@latest/dist/jquery.fancybox.min.js"></script><script src="https://fastly.jsdelivr.net/npm/node-snackbar/dist/snackbar.min.js"></script><script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script><script src="https://fastly.jsdelivr.net/npm/instant.page/instantpage.min.js" type="module" defer></script><script src="https://fastly.jsdelivr.net/npm/vanilla-lazyload/dist/lazyload.iife.min.js" async></script><script src="/js/calendar.js"></script><script src="/js/languages.js"></script></body></html>
