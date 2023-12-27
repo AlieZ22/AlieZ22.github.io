@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width,initial-scale=1"><title>zzm - blog</title><meta name="description" content="Macro optimism, Micro hustle."><meta name="keywords" content="blog"><meta name="author" content="zzm"><meta name="copyright" content="zzm"><meta name="format-detection" content="telephone=no"><link rel="shortcut icon" href="/img/favicon.png"><link rel="canonical" href="https://aliez22.github.io/"><meta http-equiv="Cache-Control" content="no-transform"><meta http-equiv="Cache-Control" content="no-siteapp"><link rel="preconnect" href="//fastly.jsdelivr.net"/><link rel="preconnect" href="//fonts.googleapis.com" crossorigin="crossorigin"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="preconnect" href="//zz.bdstatic.com"/><meta property="og:type" content="website"><meta property="og:title" content="zzm"><meta property="og:url" content="https://aliez22.github.io/"><meta property="og:site_name" content="zzm"><meta property="og:description" content="Macro optimism, Micro hustle."><meta property="og:image" content="https://avatars.githubusercontent.com/u/34917442"><meta property="article:published_time" content="2023-12-26T05:25:33.878Z"><meta property="article:modified_time" content="2023-12-26T05:25:33.878Z"><meta name="twitter:card" content="summary"><script>var activateDarkMode = function () {
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width,initial-scale=1"><title>zzm - blog</title><meta name="description" content="Macro optimism, Micro hustle."><meta name="keywords" content="blog"><meta name="author" content="zzm"><meta name="copyright" content="zzm"><meta name="format-detection" content="telephone=no"><link rel="shortcut icon" href="/img/favicon.png"><link rel="canonical" href="https://aliez22.github.io/"><meta http-equiv="Cache-Control" content="no-transform"><meta http-equiv="Cache-Control" content="no-siteapp"><link rel="preconnect" href="//fastly.jsdelivr.net"/><link rel="preconnect" href="//fonts.googleapis.com" crossorigin="crossorigin"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="preconnect" href="//zz.bdstatic.com"/><meta property="og:type" content="website"><meta property="og:title" content="zzm"><meta property="og:url" content="https://aliez22.github.io/"><meta property="og:site_name" content="zzm"><meta property="og:description" content="Macro optimism, Micro hustle."><meta property="og:image" content="https://avatars.githubusercontent.com/u/34917442"><meta property="article:published_time" content="2023-12-27T02:46:42.972Z"><meta property="article:modified_time" content="2023-12-27T02:46:42.972Z"><meta name="twitter:card" content="summary"><script>var activateDarkMode = function () {
   document.documentElement.setAttribute('data-theme', 'dark')
   if (document.querySelector('meta[name="theme-color"]') !== null) {
     document.querySelector('meta[name="theme-color"]').setAttribute('content', '#000')
@@ -89,7 +89,7 @@ if (autoChangeMode === '1') {
   isHome: true,
   isHighlightShrink: false,
   isSidebar: false,
-  postUpdate: '2023-12-26 13:25:33'
+  postUpdate: '2023-12-27 10:46:42'
 }</script><noscript><style>
 #nav {
   opacity: 1
@@ -104,9 +104,10 @@ if (autoChangeMode === '1') {
 常见限流算法常见的限流算法有：计数器固定窗口、滑动窗口、漏斗以及令牌桶算法。下面对这几种算法进行分别介绍，并给出具体的实现。
 计数器固定窗口算法最基础、最简单的限流方式
 原理：对一段固定时间窗口内的请求进行计数，若请求数超过了阈值，则舍弃；否则接受并递增计数器。当时间窗口结束时，重置计数器。
-示意图：稍后补。
+示意图：
+
 代码实现-Java：
-123456789101112131415161 ...</div></div></div><div class="recent-post-item"><div class="post_cover left_radius"><a href="/posts/41139/" title="Java基础补一补">     <img class="post_bg" data-src="https://fastly.jsdelivr.net/gh/AlieZ22/CDN-for-blog/pixiv/045.webp" onerror="this.onerror=null;this.src='/img/404.jpg'" alt="Java基础补一补"></a></div><div class="recent-post-info"><a class="article-title" href="/posts/41139/" title="Java基础补一补">Java基础补一补</a><div class="article-meta-wrap"><time class="post-meta__date" title="发表于 2023-12-19 13:33:15"><i class="far fa-calendar-alt"></i>2023-12-19</time><span class="article-meta"><span class="article-meta__separator">|</span><i class="fas fa-inbox article-meta__icon"></i><a class="article-meta__categories" href="/categories/Java%E7%9F%A5%E8%AF%86%E4%BD%93%E7%B3%BB/">Java知识体系</a></span></div><div class="content">语法基础
+123456789101112131415161718 ...</div></div></div><div class="recent-post-item"><div class="post_cover left_radius"><a href="/posts/41139/" title="Java基础补一补">     <img class="post_bg" data-src="https://fastly.jsdelivr.net/gh/AlieZ22/CDN-for-blog/pixiv/045.webp" onerror="this.onerror=null;this.src='/img/404.jpg'" alt="Java基础补一补"></a></div><div class="recent-post-info"><a class="article-title" href="/posts/41139/" title="Java基础补一补">Java基础补一补</a><div class="article-meta-wrap"><time class="post-meta__date" title="发表于 2023-12-19 13:33:15"><i class="far fa-calendar-alt"></i>2023-12-19</time><span class="article-meta"><span class="article-meta__separator">|</span><i class="fas fa-inbox article-meta__icon"></i><a class="article-meta__categories" href="/categories/Java%E7%9F%A5%E8%AF%86%E4%BD%93%E7%B3%BB/">Java知识体系</a></span></div><div class="content">语法基础
 abstract抽象方法，—虚函数的实现原理；
 
 byte的取值范围，—  [-128, 127]
